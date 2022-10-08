@@ -29,3 +29,6 @@ Route::get('/api/user/detail/{id}', 'UserController@detail');
 //Rutas Servicios
 Route::resource('/api/servicios', 'ServiciosController');
 Route::post('/api/servicios/upload', 'ServiciosController@upload');
+
+//Rutas Citas
+Route::resource('/api/citas', 'CitasController')->middleware(App\Http\Middleware\ApiAuthMiddleware::class);
