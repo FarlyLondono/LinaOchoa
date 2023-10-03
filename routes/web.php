@@ -17,18 +17,6 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-//RUTAS API
+Route::get('/serviciosImagen/{id}', 'ServiciosController@show')->name('show');
 
-//Rutas controlador usuario
-Route::get('/api/user', 'UserController@index')->middleware(App\Http\Middleware\ApiAuthMiddleware::class);
-Route::post('/api/login', 'UserController@login');
-Route::post('/api/register','UserController@register');
-Route::put('/api/user/update', 'UserController@update');
-Route::get('/api/user/detail/{id}', 'UserController@detail');
 
-//Rutas Servicios
-Route::resource('/api/servicios', 'ServiciosController');
-Route::post('/api/servicios/upload', 'ServiciosController@upload');
-
-//Rutas Citas
-Route::resource('/api/citas', 'CitasController')->middleware(App\Http\Middleware\ApiAuthMiddleware::class);

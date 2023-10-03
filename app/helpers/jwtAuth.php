@@ -36,8 +36,13 @@ class jwtAuth{
                 'email' => $user->email,
                 'name' => $user->name,
                 'surname' => $user->surname,
+                'role' => $user->role,
                 'iat' => time(),
-                'exp' => time()+(7*24*60*60)//tiempo logueo
+                //tiempo logueo
+                //'exp' => (time() + 60) // Caduca en 1 minuto
+                //'exp' => (time() + (60 * 60)) // Caduca en 1 hora
+                //'exp' => (time() + (20 * 60)) // Caduca en 20 minutos 
+                'exp' => time()+(7*24*60*60)//una semana
             );
             $JWT = JWT::encode($token, $this->key, 'HS256');
 

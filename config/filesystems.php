@@ -43,9 +43,9 @@ return [
 
     'disks' => [
 
-        'local' => [
+        'servicios' => [
             'driver' => 'local',
-            'root' => storage_path('app'),
+            'root' => storage_path('app/servicios'),
         ],
 
         'public' => [

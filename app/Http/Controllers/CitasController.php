@@ -20,7 +20,9 @@ class CitasController extends Controller
         'servicios.name as Servicio',
         'servicios.precio',
         'citas.FechaServicio',
-        'citas.observaciones')
+        'citas.observaciones',
+        'citas.estado')
+        ->where('estado','=',1)
         ->get();
 
         if(is_object($citas)){
@@ -88,15 +90,40 @@ class CitasController extends Controller
             $request->all(),
             [
                 'servicio_id'      => 'required',
-                'FechaServicio'   => 'required',
+                //'FechaServicio'   => 'required',
+                'FechaServicio'  => ['required', 'date','after_or_equal:now', 'unique:citas,FechaServicio', function ($attribute, $value, $fail) {
+                    // Verificar que la fecha sea desde el día actual en adelante
+                    $currentDate = now();
+                    if (strtotime($value) < strtotime($currentDate)) {
+                        $fail('La fecha de servicio debe ser desde el día actual en adelante.');
+                    }
+                }],
+                
             ]
         );
         if($validate->fails()){
-            $data = [
-                'code' => 400,
+
+            $validations = json_decode($validate->errors(), true);
+
+            if(isset($validations['FechaServicio'])) {
+                $data = array( //La validacion ah fallado!!
+                    'status' => 'errorFecha',
+                    'code' => 400,
+                    'message' => 'Revisa la fecha de creacion, ya esta disponible!!',
+                );
+            }else{
+                //La validacion ah fallado!!
+            $data = array(
                 'status' => 'error',
-                'message' => 'No se a guardado la Evaluacion, faltan datos'
-            ];
+                'code' => 404,
+                'message' => 'la cita no se ha creado revisa los datos',
+                'errors' => $validate->errors()
+            );
+
+
+            }
+
+            return response()->json($data, $data['code']);
 
         }else{
 
@@ -106,6 +133,7 @@ class CitasController extends Controller
             $citas->servicio_id= $request->servicio_id;
             $citas->FechaServicio= $request['FechaServicio'];
             $citas->observaciones= $request['observaciones'];
+            $citas->estado=1;
             $citas->save();
 
             $data = [
@@ -123,6 +151,11 @@ class CitasController extends Controller
     
     //ACTUALIZAR CITAS
     public function update($id, Request $request){
+
+        //sacar usuario identificado
+        //$user = $this->getIdentity($request);
+
+
         //Validar los datos
         $validate = Validator::make(
             $request->all(), [
@@ -138,7 +171,7 @@ class CitasController extends Controller
 
         //Eliminar lo que no quiero actualizar
         unset($request['id']);
-        unset($request['user_id']);
+        //unset($request['user_id']);
         unset($request['create_at']);
 
         //Conseguri usduario identificado
@@ -146,15 +179,20 @@ class CitasController extends Controller
 
         //Buscar el registro a actualizar
         $citas = citas::where('id', $id)
-        ->where('user_id', $user->sub)
+        //->where('user_id', $user->sub)
         ->first();
+
+        
 
 
         if(!empty($citas) && is_object($citas)){
                 
             //Actualizar registro en concreto
-            $citas->update($request->all());
-            
+            //$citas->update($request->all());
+            $citas->user_id = $user->sub;
+            $citas->estado = 2;
+            $citas->save();
+                    
             //devolver algo
             $data = [
                 'code' => 200,

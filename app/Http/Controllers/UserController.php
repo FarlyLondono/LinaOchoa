@@ -4,14 +4,26 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Validator;
+use App\helpers\jwtAuth;
+use Carbon\Carbon;
 use App\User;
+
+
 
 class UserController extends Controller
 {
 
+//prueba
+public function prueba(){
 
-    //LISTAR USUARIOS
-    public function index(Request $request) {
+    $carbonDate = Carbon::parse("America/Bogota");
+    $fechaDia = $carbonDate->format("d-m-Y H:i:s");
+    return $fechaDia;
+}
+
+//LISTAR USUARIOS
+public function index(Request $request) {
         //CONSULTAR LOS DATOS PARA MOSTRARLOS
 
         
@@ -22,58 +34,77 @@ class UserController extends Controller
                 'User' =>$User
             ]);
        
-    }
+}
 
-    //REGISTRAR
-    public function register(Request $request) {
+
+//REGISTRAR administrador
+public function registerAdmin(Request $request) {
         //return "accion de resgistro usuario";
         
-        //Recoger los datos del usuario
-        $json =$request->input('json',null);
+        //Recoger los datos del usuario menos el passwor
+        $params_array = array_map('trim', $request->except('password'));
 
-        $params = \GuzzleHttp\json_decode($json);
-        $params_array = \GuzzleHttp\json_decode($json,true);
-
-        //Validar entrada de datos
-        if(!empty($params) && !empty($params_array)){
-
+        //Validar datos
+        $validate = Validator::make(
+            $request->all(), [
+            'document' => 'required|unique:users',
+            'name' => 'required|alpha',
+            'surname' => 'required|alpha',
+            'email' => 'required|email|unique:users',//Comprobar si existe el usuario
+            'password' => 'required'
+        ]);
             //Limpiar datos!!
-            $params_array = array_map('trim', $params_array);
+            //$params_array = array_map('trim', $params_array);
+            if($validate->fails()){
 
-                //Validar datos
-                $validate = \Validator::make(
-                    $params_array, [
-                    'name' => 'required|alpha|unique:users',
-                    'surname' => 'required|alpha',
-                    'email' => 'required|email|unique:users',//Comprobar si existe el usuario
-                    'password' => 'required'
-                ]);
+                $validations = json_decode($validate->errors(), true);
 
-                    if($validate->fails()){
 
-                        //La validacion ah fallado!!
-                        $data = array(
-                            'status' => 'error',
-                            'code' => 404,
-                            'message' => 'el usuario no se a creado',
-                            'errors' => $validate->errors()
+                    if(isset($validations['email'])) {
+                        $data = array( //La validacion ah fallado!!
+                            'status' => 'errorEmail',
+                            'code' => 400,
+                            'message' => 'Revisa el correo, puede que ya exista!',
                         );
-
-
                     }else{
+                    //La validacion ah fallado!!
+                    $data = array(
+                        'status' => 'error',
+                        'code' => 404,
+                        'message' => 'el usuario no se a creado',
+                        'errors' => $validate->errors()
+                    );
+                }  
+                
+                return response()->json($data, $data['code']);
+
+            }
+            
+            
+            try {
 
                         //validacion pasada correctamente!!
                         
                         //Cifrar contraseña
-                        $pwd=hash('sha256', $params->password);
+                        $pwd=hash('sha256', $request->password);
+
+                        $carbonDate = Carbon::parse("America/Bogota");
+                        $fechaDia = $carbonDate->format("d-m-Y H:i:s");
+
+                        //var_dump($fechaDia);
 
                         //crear el usuario y guarda en BD!!
                         $user=new User();
+                        $user->document = $params_array['document'];
                         $user->name=$params_array['name'];
                         $user->surname=$params_array['surname'];
                         $user->email=$params_array['email'];
                         $user->password=$pwd;
-                        $user->role = 'role_user';
+                        $user->role = $params_array['role'];
+                        $user->created_at=$fechaDia;
+                        $user->state = 'inactivo';
+
+
 
                         $user->save();
                         
@@ -85,73 +116,171 @@ class UserController extends Controller
                             'user' => $user
                         );
 
+                }catch (Exception $e) {
+                    $data = array(
+                        'status' => 'error',
+                        'code' => 400,
+                        'message' => 'error inesperado!!',
+                        'errors' => $e
+                    );
                 }
-
-
-        }else{
-
-            $data = array(
-                'status' => 'error',
-                'code' => 404,
-                'message' => 'Los datos enviados no son correctos'
-            );
-
-
-        }
 
         return response()->json($data, $data['code']);
 
-    }
+}
 
-    //Login usuario
-    public function login(Request $request){
-        $jwtAuth = new \jwtAuth();
+ //registro de usuario
+public function registerUser(Request $request) {
 
-        //Recibir datos por post
-        $json = $request->input('json', null);
-
-        $params= json_decode($json);
-        $params_array=json_decode($json, true);
-        //Validar datos
-        $validate = \Validator::make(
-            $params_array , [
-                'email' => 'required|email',
+            $validate = Validator::make(
+                $request->all(), [
+                'document' => 'required|unique:users',
+                'name' => 'required|alpha',
+                'surname' => 'required|alpha',
+                'email' => 'required|email|unique:users',//Comprobar si existe el usuario
                 'password' => 'required'
-            ]);
-
-        if($validate->fails()){
-            $signup = array(
-                'status' => 'error',
-                'code' => 404,
-                'message' => 'El usuario no se a podido loguear',
-                'errors' => $validate->errors()
+            ]
             );
-        }else{
 
-            //Cifrar la contraseña
-            $pwd = hash('sha256', $params->password);
+            if($validate->fails()){
 
-            //devolver token o datos
-            $signup = $jwtAuth ->signup($params->email, $pwd);
+                $validations = json_decode($validate->errors(), true);
 
-        if(!empty($params->gettoken)){
-            $signup = $jwtAuth ->signup($params->email, $pwd, true);
+
+                    if (isset($validations['email'])) {
+                        $data = array( //La validacion ah fallado!!
+                            'status' => 'errorEmail',
+                            'code' => 400,
+                            'message' => 'Revisa el correo, puede que ya exista!',
+                        );
+                    }elseif(isset($validations['document'])) {
+                        $data = array( //La validacion ah fallado!!
+                            'status' => 'errorDocument',
+                            'code' => 400,
+                            'message' => 'Revisa el documento, puede que ya exista!',
+                        );
+                    }else{
+                    //La validacion ah fallado!!
+                    $data = array(
+                        'status' => 'error',
+                        'code' => 404,
+                        'message' => 'el usuario no se a creado',
+                        'errors' => $validate->errors()
+                    );
+                }  
+                
+                return response()->json($data, $data['code']);
+
+            }
+
+            try {
+                $params_array = array_map('trim', $request->except('password'));
+                $pwd = hash('sha256', $request->password); //Cifrar contraseñas!!
+    
+                //crear el usuario!!
+                $user = new User();
+                $user->document = $params_array['document'];
+                $user->name = $params_array['name'];
+                $user->surname = $params_array['surname'];
+                $user->email = $params_array['email'];
+                $user->password = $pwd;
+                $user->role = 'usuario';
+                $user->state = 'activo';
+    
+                //guardar el usuario!!
+                $user->save();
+    
+                $data = array(
+                    'status' => 'success',
+                    'code' => 200,
+                    'message' => 'el usuario se ha creado correctamente!!',
+                    'data' => $params_array
+                );
+            } catch (Exception $e) {
+                $data = array(
+                    'status' => 'error',
+                    'code' => 400,
+                    'message' => 'error inesperado!!',
+                    'errors' => $e
+                );
+            }
+    
+            return response()->json($data, $data['code']);
+
+
+
+
+
+}
+
+
+//Login usuario
+public function login(Request $request){
+
+    $jwtAuth = new jwtAuth();
+        
+    //Validar datos
+    $validate = Validator::make(
+        $request->all(), [
+            'email' => 'required',
+            'password' => 'required'
+        ]);
+
+        
+
+       
+        if($validate->fails()){
+            //$validations = json_decode($validate->errors(), true);
+
+                        //La validacion ah fallado!!
+                            $data = array( //La validacion ah fallado!!
+                                'status' => 'errorPassword',
+                                'code' => 400,
+                                'message' => 'Revisa tus datos',
+                            );
+                
+        
+                return response()->json($data, $data['code']);
         }
 
+        try {
+            //Cifrar la contraseña
+            $pwd = hash('sha256', $request->password);
+
+            //devolver token o datos
+            $signup = $jwtAuth ->signup($request->email, $pwd);
+
+        if(!empty($request->gettoken)){
+            $signup = $jwtAuth ->signup($request->email, $pwd, true);
         }
 
         return response()->json($signup, 200);
 
-    }
 
-    //Actualizar usuario
-    public function update(Request $request){
+        }catch (Exception $e) {
+            $data = array(
+                'status' => 'error',
+                'code' => 400,
+                'message' => 'error inesperado!!',
+                'errors' => $e
+            );
+        }
+
+        return response()->json($signup, $signup['code']);
+        
+
+}
+
+
+
+//Actualizar usuario
+public function update(Request $request){
         //Comprobar si el usuario esta identificado
         
         //recogemos token de autorizacion
         $token = $request ->header('Authorization');
         //iniciamos objeto
-        $jwtAuth=new \jwtAuth();
+        $jwtAuth=new jwtAuth();
         //chequeamos si el token es correcto
         $checkToken = $jwtAuth->checkToken($token);
 
@@ -178,6 +307,8 @@ class UserController extends Controller
 
             //Quitar los campos que no quiero actualizar
             unset($params_array['id']);
+            unset($params_array['document']);
+            unset($params_array['state']);
             unset($params_array['role']);
             unset($params_array['password']);
             unset($params_array['create_at']);
@@ -204,10 +335,11 @@ class UserController extends Controller
         }
         return response()->json($data, $data['code']);
 
-    }
+}
 
-    //Ver detalle de usuario
-    public function detail($id){
+
+//Ver detalle de usuario
+public function detail($id){
         $user = User::find($id);
 
         if(is_object($user)){
@@ -226,7 +358,7 @@ class UserController extends Controller
 
         return response()->json($data, $data['code']);
 
-    }
+}
 
 
 
